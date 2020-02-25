@@ -699,6 +699,64 @@ class APIRouter(routing.Router):
 
         return decorator
 
+def api_route(
+        self,
+        path: str,
+        *,
+        response_model: Type[Any] = None,
+        status_code: int = 200,
+        tags: List[str] = None,
+        dependencies: Sequence[params.Depends] = None,
+        summary: str = None,
+        description: str = None,
+        response_description: str = "Successful Response",
+        responses: Dict[Union[int, str], Dict[str, Any]] = None,
+        deprecated: bool = None,
+        methods: List[str] = None,
+        operation_id: str = None,
+        response_model_include: Union[SetIntStr, DictIntStrAny] = None,
+        response_model_exclude: Union[SetIntStr, DictIntStrAny] = set(),
+        response_model_by_alias: bool = True,
+        response_model_skip_defaults: bool = None,
+        response_model_exclude_unset: bool = False,
+        include_in_schema: bool = True,
+        response_class: Type[Response] = None,
+        name: str = None,
+        callbacks: List[APIRoute] = None,
+    ) -> Callable:
+        if response_model_skip_defaults is not None:
+            warning_response_model_skip_defaults_deprecated()  # pragma: nocover
+
+        def decorator(func: Callable) -> Callable:
+            self.add_api_route(
+                path,
+                func,
+                response_model=response_model,
+                status_code=status_code,
+                tags=tags or [],
+                dependencies=dependencies,
+                summary=summary,
+                description=description,
+                response_description=response_description,
+                responses=responses or {},
+                deprecated=deprecated,
+                methods=methods,
+                operation_id=operation_id,
+                response_model_include=response_model_include,
+                response_model_exclude=response_model_exclude,
+                response_model_by_alias=response_model_by_alias,
+                response_model_exclude_unset=bool(
+                    response_model_exclude_unset or response_model_skip_defaults
+                ),
+                include_in_schema=include_in_schema,
+                response_class=response_class or self.default_response_class,
+                name=name,
+                callbacks=callbacks,
+            )
+            return func
+
+        return decorator
+        
     def add_api_websocket_route(
         self, path: str, endpoint: Callable, name: str = None
     ) -> None:
