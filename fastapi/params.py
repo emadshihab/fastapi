@@ -15,6 +15,13 @@ class ParamTypes(Enum):
     cookie = "cookie"
 
 
+class ParamTypes(Enum):
+    query = "query"
+    header = "header"
+    path = "path"
+    cookie = "cookie"
+
+
 class Param(FieldInfo):
     in_: ParamTypes
 
