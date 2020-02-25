@@ -178,22 +178,7 @@ async def app(request: Request) -> Response:
         solved_result = await solve_dependencies(
             request=request,
             dependant=dependant,
-            body=body,
-            dependency_overrides_provider=dependency_overrides_provider,
-        )
-        values, errors, background_tasks, sub_response, _ = solved_result
-        if errors:
-            raise RequestValidationError(errors, body=body)
-        else:
-            assert dependant.call is not None, "dependant.call must be a function"
-            if is_coroutine:
-                raw_response = await dependant.call(**values)
-            else:
-                raw_response = await run_in_threadpool(dependant.call, **values)
-            if isinstance(raw_response, Response):
-                if raw_response.background is None:
-                    raw_response.background = background_tasks
-                return raw_response
+
             
             )
             response = response_class(
@@ -210,7 +195,7 @@ async def app(request: Request) -> Response:
 
 
 
-def get_websocket_app(
+def get_websocket_app2(
     dependant: Dependant, dependency_overrides_provider: Any = None
 ) -> Callable:
     async def app(websocket: WebSocket) -> None:
@@ -249,6 +234,172 @@ class APIWebSocketRoute(routing.WebSocketRoute):
             )
         )
         self.path_regex, self.path_format, self.param_convertors = compile_path(path)
+
+
+class APIRoute(routing.Route):
+    def __init__(
+        self,
+        path: str,
+        endpoint: Callable,
+        *,
+        response_model: Type[Any] = None,
+        status_code: int = 200,
+        tags: List[str] = None,
+        dependencies: Sequence[params.Depends] = None,
+        summary: str = None,
+        description: str = None,
+        response_description: str = "Successful Response",
+        responses: Dict[Union[int, str], Dict[str, Any]] = None,
+        deprecated: bool = None,
+        name: str = None,
+        methods: Optional[Union[Set[str], List[str]]] = None,
+        operation_id: str = None,
+        response_model_include: Union[SetIntStr, DictIntStrAny] = None,
+        response_model_exclude: Union[SetIntStr, DictIntStrAny] = set(),
+        response_model_by_alias: bool = True,
+        response_model_exclude_unset: bool = False,
+        include_in_schema: bool = True,
+        response_class: Optional[Type[Response]] = None,
+        dependency_overrides_provider: Any = None,
+        callbacks: Optional[List["APIRoute"]] = None,
+    ) -> None:
+        self.path = path
+        self.endpoint = endpoint
+        self.name = get_name(endpoint) if name is None else name
+        self.path_regex, self.path_format, self.param_convertors = compile_path(path)
+        if methods is None:
+            methods = ["GET"]
+        self.methods = set([method.upper() for method in methods])
+        self.unique_id = generate_operation_id_for_path(
+            name=self.name, path=self.path_format, method=list(methods)[0]
+        )
+        self.response_model = response_model
+        if self.response_model:
+            assert (
+                status_code not in STATUS_CODES_WITH_NO_BODY
+            ), f"Status code {status_code} must not have a response body"
+            response_name = "Response_" + self.unique_id
+            if PYDANTIC_1:
+                self.response_field: Optional[ModelField] = ModelField(
+                    name=response_name,
+                    type_=self.response_model,
+                    class_validators={},
+                    default=None,
+                    required=False,
+                    model_config=BaseConfig,
+                    field_info=FieldInfo(None),
+                )
+            else:
+                self.response_field: Optional[ModelField] = ModelField(  # type: ignore  # pragma: nocover
+                    name=response_name,
+                    type_=self.response_model,
+                    class_validators={},
+                    default=None,
+                    required=False,
+                    model_config=BaseConfig,
+                    schema=FieldInfo(None),
+                )
+            # Create a clone of the field, so that a Pydantic submodel is not returned
+            # as is just because it's an instance of a subclass of a more limited class
+            # e.g. UserInDB (containing hashed_password) could be a subclass of User
+            # that doesn't have the hashed_password. But because it's a subclass, it
+            # would pass the validation and be returned as is.
+            # By being a new field, no inheritance will be passed as is. A new model
+            # will be always created.
+            self.secure_cloned_response_field: Optional[
+                ModelField
+            ] = create_cloned_field(self.response_field)
+        else:
+            self.response_field = None
+            self.secure_cloned_response_field = None
+        self.status_code = status_code
+        self.tags = tags or []
+        if dependencies:
+            self.dependencies = list(dependencies)
+        else:
+            self.dependencies = []
+        self.summary = summary
+        self.description = description or inspect.cleandoc(self.endpoint.__doc__ or "")
+        # if a "form feed" character (page break) is found in the description text,
+        # truncate description text to the content preceding the first "form feed"
+        self.description = self.description.split("\f")[0]
+        self.response_description = response_description
+        self.responses = responses or {}
+        response_fields = {}
+        for additional_status_code, response in self.responses.items():
+            assert isinstance(response, dict), "An additional response must be a dict"
+            model = response.get("model")
+            if model:
+                assert (
+                    additional_status_code not in STATUS_CODES_WITH_NO_BODY
+                ), f"Status code {additional_status_code} must not have a response body"
+                assert lenient_issubclass(
+                    model, BaseModel
+                ), "A response model must be a Pydantic model"
+                response_name = f"Response_{additional_status_code}_{self.unique_id}"
+                if PYDANTIC_1:
+                    response_field = ModelField(
+                        name=response_name,
+                        type_=model,
+                        class_validators=None,
+                        default=None,
+                        required=False,
+                        model_config=BaseConfig,
+                        field_info=FieldInfo(None),
+                    )
+                else:
+                    response_field = ModelField(  # type: ignore  # pragma: nocover
+                        name=response_name,
+                        type_=model,
+                        class_validators=None,
+                        default=None,
+                        required=False,
+                        model_config=BaseConfig,
+                        schema=FieldInfo(None),
+                    )
+                response_fields[additional_status_code] = response_field
+        if response_fields:
+            self.response_fields: Dict[Union[int, str], ModelField] = response_fields
+        else:
+            self.response_fields = {}
+        self.deprecated = deprecated
+        self.operation_id = operation_id
+        self.response_model_include = response_model_include
+        self.response_model_exclude = response_model_exclude
+        self.response_model_by_alias = response_model_by_alias
+        self.response_model_exclude_unset = response_model_exclude_unset
+        self.include_in_schema = include_in_schema
+        self.response_class = response_class
+
+        assert inspect.isfunction(endpoint) or inspect.ismethod(
+            endpoint
+        ), f"An endpoint must be a function or method"
+        self.dependant = get_dependant(path=self.path_format, call=self.endpoint)
+        for depends in self.dependencies[::-1]:
+            self.dependant.dependencies.insert(
+                0,
+                get_parameterless_sub_dependant(depends=depends, path=self.path_format),
+            )
+        self.body_field = get_body_field(dependant=self.dependant, name=self.unique_id)
+        self.dependency_overrides_provider = dependency_overrides_provider
+        self.callbacks = callbacks
+        self.app = request_response(self.get_route_handler())
+
+    def get_route_handler(self) -> Callable:
+        return get_request_handler(
+            dependant=self.dependant,
+            body_field=self.body_field,
+            status_code=self.status_code,
+            response_class=self.response_class or JSONResponse,
+            response_field=self.secure_cloned_response_field,
+            response_model_include=self.response_model_include,
+            response_model_exclude=self.response_model_exclude,
+            response_model_by_alias=self.response_model_by_alias,
+            response_model_exclude_unset=self.response_model_exclude_unset,
+            dependency_overrides_provider=self.dependency_overrides_provider,
+        )
+
+
 
 
 class APIRoute(routing.Route):
