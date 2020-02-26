@@ -98,6 +98,21 @@ def get_request_handler(
     response_model_by_alias: bool = True,
     response_model_exclude_unset: bool = False,
     dependency_overrides_provider: Any = None,
+
+
+    def get_request_handler(
+    dependant: Dependant,
+    body_field: ModelField = None,
+    status_code: int = 200,
+    response_class: Type[Response] = JSONResponse,
+    response_field: ModelField = None,
+    response_model_include: Union[SetIntStr, DictIntStrAny] = None,
+    response_model_exclude: Union[SetIntStr, DictIntStrAny] = set(),
+    response_model_by_alias: bool = True,
+    response_model_exclude_unset: bool = False,
+    dependency_overrides_provider: Any = None,
+
+
 ) -> Callable:
     assert dependant.call is not None, "dependant.call must be a function"
     is_coroutine = asyncio.iscoroutinefunction(dependant.call)
@@ -191,7 +206,7 @@ async def app(request: Request) -> Response:
                 response.status_code = sub_response.status_code
             return response
 
-    return app1
+    return app
 
 
 
