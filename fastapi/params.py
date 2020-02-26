@@ -8,7 +8,11 @@ except ImportError:  # pragma: nocover
     from pydantic import Schema as FieldInfo  # type: ignore
 
 
-
+class ParamTypes(Enum):
+    query = "query"
+    header = "header"
+    path = "path"
+    cookie = "cookie"
 
 
 class ParamTypes(Enum):
