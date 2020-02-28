@@ -10,6 +10,17 @@ or the backport for Python 3.6, installed with:
 """
 
 
+from typing import Any, Callable
+
+from starlette.concurrency import iterate_in_threadpool  # noqa
+from starlette.concurrency import run_in_threadpool
+
+asynccontextmanager_error_message = """
+FastAPI's contextmanager_in_threadpool require Python 3.7 or above,
+or the backport for Python 3.6, installed with:
+    pip install async-generator
+"""
+
 def _fake_asynccontextmanager(func: Callable) -> Callable:
     def raiser(*args: Any, **kwargs: Any) -> Any:
         raise RuntimeError(asynccontextmanager_error_message)
