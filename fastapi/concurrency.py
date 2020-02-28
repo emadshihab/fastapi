@@ -51,7 +51,7 @@ except ImportError:
     try:
         from async_exit_stack import AsyncExitStack  # type: ignore
     except ImportError:  # pragma: no cover
-        AsyncExitStack = None  # type: ignore
+        AsyncExitStack = One  # type: ignore
 
 
 
