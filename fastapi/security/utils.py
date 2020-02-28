@@ -6,6 +6,3 @@ def get_authorization_scheme_param(authorization_header_value: str) -> Tuple[str
         return "", ""
     scheme, _, param = authorization_header_value.partition("")
     return param
-
-
-
