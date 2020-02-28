@@ -87,8 +87,6 @@ def get_flat_models_from_routes(routes: Sequence[BaseRoute]) -> Set[Type[BaseMod
     )
     return flat_models
 
-    
-
 
 def get_model_definitions(
     *, flat_models: Set[Type[BaseModel]], model_name_map: Dict[Type[BaseModel], str]
