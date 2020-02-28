@@ -36,11 +36,6 @@ except ImportError:  # pragma: no cover
             return str(v)
 
 
-class Contact(BaseModel):
-    name: Optional[str] = None
-    url: Optional[AnyUrl] = None
-    email: Optional[EmailStr] = None
-
 
 class License(BaseModel):
     name: str
@@ -196,6 +191,21 @@ class Header(ParameterBase):
 # Workaround OpenAPI recursive reference
 class EncodingWithHeaders(Encoding):
     headers: Optional[Dict[str, Union[Header, Reference]]] = None
+
+
+class RequestBody(BaseModel):
+    description: Optional[str] = None
+    content: Dict[str, MediaType]
+    required: Optional[bool] = None
+
+
+class Link(BaseModel):
+    operationRef: Optional[str] = None
+    operationId: Optional[str] = None
+    parameters: Optional[Dict[str, Union[Any, str]]] = None
+    requestBody: Optional[Union[Any, str]] = None
+    description: Optional[str] = None
+    server: Optional[Server] = None
 
 
 class RequestBody(BaseModel):
