@@ -43,6 +43,14 @@ def warning_response_model_skip_defaults_deprecated() -> None:
     )
 
 
+# TODO: remove when removing support for Pydantic < 1.0.0
+def warning_response_model_skip_defaults_deprecated() -> None:
+    logger.warning(  # pragma: nocover
+        "response_model_skip_defaults has been deprecated in favor of "
+        "response_model_exclude_unset to keep in line with Pydantic v1, support for "
+        "it will be removed soon."
+    )
+
 
 
 # TODO: remove when removing support for Pydantic < 1.0.0
