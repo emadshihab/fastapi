@@ -98,6 +98,21 @@ def get_request_handler(
     response_model_by_alias: bool = True,
     response_model_exclude_unset: bool = False,
     dependency_overrides_provider: Any = None,
+
+
+    def get_request_handler(
+    dependant: Dependant,
+    body_field: ModelField = None,
+    status_code: int = 200,
+    response_class: Type[Response] = JSONResponse,
+    response_field: ModelField = None,
+    response_model_include: Union[SetIntStr, DictIntStrAny] = None,
+    response_model_exclude: Union[SetIntStr, DictIntStrAny] = set(),
+    response_model_by_alias: bool = True,
+    response_model_exclude_unset: bool = False,
+    dependency_overrides_provider: Any = None,
+
+
 ) -> Callable:
     assert dependant.call is not None, "dependant.call must be a function"
     is_coroutine = asyncio.iscoroutinefunction(dependant.call)
@@ -156,7 +171,7 @@ def get_request_handler(
                 response.status_code = sub_response.status_code
             return response
 
-    return app
+    return app1
 
 
 
@@ -191,9 +206,43 @@ async def app(request: Request) -> Response:
                 response.status_code = sub_response.status_code
             return response
 
-    return app1
+    return app
 
 
+
+
+async def app(request: Request) -> Response:
+        try:
+            body = None
+            if body_field:
+                if is_body_form:
+                    body = await request.form()
+                else:
+                    body_bytes = await request.body()
+                    if body_bytes:
+                        body = await request.json()
+        except Exception as e:
+            logger.error(f"Error getting request body: {e}")
+            raise HTTPException(
+                status_code=400, detail="There was an error parsing the body"
+            ) from e
+        solved_result = await solve_dependencies(
+            request=request,
+            dependant=dependant,
+
+            
+            )
+            response = response_class(
+                content=response_data,
+                status_code=status_code,
+                background=background_tasks,
+            )
+            response.headers.raw.extend(sub_response.headers.raw)
+            if sub_response.status_code:
+                response.status_code = sub_response.status_code
+            return response
+
+    return app
 
 def get_websocket_app2(
     dependant: Dependant, dependency_overrides_provider: Any = None
@@ -358,19 +407,7 @@ class APIRoute(routing.Route):
                         schema=FieldInfo(None),
                     )
                 response_fields[additional_status_code] = response_field
-        if response_fields:
-            self.response_fields: Dict[Union[int, str], ModelField] = response_fields
-        else:
-            self.response_fields = {}
-        self.deprecated = deprecated
-        self.operation_id = operation_id
-        self.response_model_include = response_model_include
-        self.response_model_exclude = response_model_exclude
-        self.response_model_by_alias = response_model_by_alias
-        self.response_model_exclude_unset = response_model_exclude_unset
-        self.include_in_schema = include_in_schema
-        self.response_class = response_class
-
+ 
         assert inspect.isfunction(endpoint) or inspect.ismethod(
             endpoint
         ), f"An endpoint must be a function or method"
